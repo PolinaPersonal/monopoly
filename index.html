@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#F4EFE3">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Full Board">
+  <meta name="description" content="Walk London and complete the Monopoly board.">
+  <title>Full Board · London</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="app">
+    <header class="top">
+      <div class="brand">
+        <span class="eyebrow">FULL BOARD</span>
+        <span class="brand-city">London</span>
+      </div>
+      <div class="top-actions">
+        <span class="gps" data-role="gps" aria-live="polite">Locating…</span>
+        <button type="button" class="icon-btn" data-action="settings" aria-label="Settings">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <section class="view" id="view-board" data-view="board">
+        <div class="stats">
+          <div class="stat"><span class="stat-num"><span data-stat="props">0</span><small>/28</small></span><span class="stat-label">Properties</span></div>
+          <div class="stat"><span class="stat-num"><span data-stat="sets">0</span><small>/8</small></span><span class="stat-label">Colour sets</span></div>
+          <div class="stat stat-dark"><span class="stat-num" data-stat="value">£0</span><span class="stat-label">Portfolio</span></div>
+        </div>
+        <div id="board-host"></div>
+        <p class="hint">Pinch or double-tap to zoom · drag to move · tap a square for its deed</p>
+        <div id="nearby"></div>
+      </section>
+
+      <section class="view" id="view-deeds" data-view="deeds" hidden></section>
+      <section class="view" id="view-album" data-view="album" hidden></section>
+      <section class="view" id="view-alerts" data-view="alerts" hidden></section>
+    </main>
+
+    <nav class="tabs" aria-label="Main">
+      <button type="button" data-tab="board" aria-current="page">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="8" y="8" width="8" height="8"/></svg>Board</button>
+      <button type="button" data-tab="deeds">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M5 8h14M9 12h6M9 16h6"/></svg>Deeds</button>
+      <button type="button" data-tab="album">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Album</button>
+      <button type="button" data-tab="alerts">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4z"/><path d="M10 20a2 2 0 004 0"/></svg>Alerts<span class="badge" data-role="badge" hidden></span></button>
+    </nav>
+  </div>
+
+  <div id="overlay" class="overlay" hidden></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <button type="button" id="test-fab" class="test-fab" hidden>TEST</button>
+  <input type="file" id="photo-input" accept="image/*" capture="user" hidden>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

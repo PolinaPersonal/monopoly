@@ -1,5 +1,5 @@
 // Service worker: lets the app open with a weak signal and shows notifications.
-const VERSION = 'fullboard-v1';
+const VERSION = 'fullboard-v2';
 const ASSETS = [
   './',
   'index.html',
@@ -31,7 +31,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: 'no-cache' }) // always check for a newer version
       .then((res) => {
         if (res.ok && new URL(e.request.url).origin === location.origin) {
           const copy = res.clone();

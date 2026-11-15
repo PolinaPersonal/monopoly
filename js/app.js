@@ -41,6 +41,7 @@ function cloudShape() {
     alerts: (state.alerts || []).slice(0, 40),
     started: !!state.started,
     startedAt: state.startedAt || 0,
+    photos: state.photos || {},
     updatedAt: Date.now(),
   };
 }
@@ -49,6 +50,16 @@ function persist() {
   if (pid) cloud.saveBoard(pid, cloudShape());
 }
 const photoKey = (id) => `${pid}:${id}`;
+
+// A photo stamp from this phone, or else from the online copy (then cached here).
+async function getPhotoAnywhere(id) {
+  const local = await store.getPhoto(photoKey(id));
+  if (local) return local;
+  if (!state.photos || !state.photos[id]) return null;
+  const remote = await cloud.downloadPhoto(pid, id);
+  if (remote) await store.savePhoto(photoKey(id), remote);
+  return remote;
+}
 const fmtMoney = (n) => `£${n.toLocaleString('en-GB')}`;
 
 // ---------- Derived numbers ----------
@@ -202,7 +213,7 @@ async function renderAlbum() {
   const items = await Promise.all(
     ids.map(async (id) => {
       const s = BY_ID[id];
-      const blob = await store.getPhoto(photoKey(id));
+      const blob = await getPhotoAnywhere(id);
       let media;
       if (blob) {
         const url = URL.createObjectURL(blob);
@@ -216,8 +227,23 @@ async function renderAlbum() {
           <span class="album-name">${esc(s.name.toUpperCase())}</span></button>`;
     })
   );
-  host.innerHTML = `<div class="page-head"><span class="eyebrow">THE ALBUM</span><h1>Photo stamps</h1><p>${ids.length} ${ids.length === 1 ? 'deed' : 'deeds'} · tap one to add or share a photo</p></div>
+  const withPhotos = ids.filter((id) => state.photos && state.photos[id]);
+  host.innerHTML = `<div class="page-head"><span class="eyebrow">THE ALBUM</span><h1>Photo stamps</h1><p>${ids.length} ${ids.length === 1 ? 'deed' : 'deeds'} · tap one to add or share a photo. Photos are saved online with your board.</p>
+      ${withPhotos.length ? `<button type="button" class="btn btn-light" data-act="download-all" style="margin-top:10px">Download all ${withPhotos.length} photo${withPhotos.length === 1 ? '' : 's'}</button>` : ''}</div>
     <div class="album-grid">${items.join('')}</div>`;
+  const all = host.querySelector('[data-act="download-all"]');
+  if (all)
+    all.addEventListener('click', async () => {
+      all.disabled = true;
+      all.textContent = 'Preparing…';
+      for (const id of withPhotos) {
+        const blob = await getPhotoAnywhere(id);
+        if (blob) downloadBlob(BY_ID[id], blob);
+        await new Promise((r) => setTimeout(r, 600));
+      }
+      all.disabled = false;
+      all.textContent = `Download all ${withPhotos.length} photos`;
+    });
 }
 
 function timeAgo(iso) {
@@ -559,7 +585,7 @@ function openPhoto(id) {
     photoInput.click();
     return;
   }
-  store.getPhoto(photoKey(id)).then((blob) => {
+  getPhotoAnywhere(id).then((blob) => {
     if (blob) showPhotoSheet(id, blob);
     else {
       delete state.photos[id];
@@ -624,6 +650,9 @@ photoInput.addEventListener('change', async () => {
     await store.savePhoto(photoKey(id), blob);
     state.photos[id] = true;
     persist();
+    cloud.uploadPhoto(pid, id, blob).then((ok) => {
+      if (!ok) toast('Photo saved on this phone', 'It will need a connection to back up online. Try Retake later if it’s missing elsewhere.');
+    });
     if (currentView() === 'album') renderAlbum();
     showPhotoSheet(id, blob);
   } catch (e) {
@@ -644,7 +673,7 @@ async function composeStamp(s, file) {
   await document.fonts.ready;
   const img = await loadImage(file);
   const W = 1080;
-  const H = 1350;
+  const H = 1350; // drawn at this size, then saved small enough to back up online
   const c = document.createElement('canvas');
   c.width = W;
   c.height = H;
@@ -729,7 +758,16 @@ async function composeStamp(s, file) {
   x.fillStyle = '#5C574D';
   x.fillText(`No. ${claimOrder(s.id) || claimedCount()} of 28`, W - pad - 6, H - 60);
   URL.revokeObjectURL(img.src);
-  return new Promise((resolve) => c.toBlob(resolve, 'image/jpeg', 0.86));
+  // Keep the file under ~650 KB so it fits in the online store.
+  for (const q of [0.82, 0.7, 0.58, 0.45]) {
+    const blob = await new Promise((resolve) => c.toBlob(resolve, 'image/jpeg', q));
+    if (blob.size < 650000) return blob;
+  }
+  const small = document.createElement('canvas');
+  small.width = 720;
+  small.height = 900;
+  small.getContext('2d').drawImage(c, 0, 0, 720, 900);
+  return new Promise((resolve) => small.toBlob(resolve, 'image/jpeg', 0.6));
 }
 
 // ---------- Notifications ----------
@@ -1187,6 +1225,7 @@ function mergeRemote(r) {
   [...(state.alerts || []), ...(r.alerts || [])].forEach((a) => (alerts[a.at + a.title] = a));
   state.alerts = Object.values(alerts).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 60);
   state.setsAwarded = [...new Set([...(state.setsAwarded || []), ...(r.setsAwarded || [])])].filter(isSetComplete);
+  state.photos = { ...(r.photos || {}), ...(state.photos || {}) };
   if (r.started) state.started = true;
   if (r.startedAt && (!state.startedAt || r.startedAt < state.startedAt)) state.startedAt = r.startedAt;
 }
@@ -1229,6 +1268,7 @@ async function enterBoard(name) {
     mergeRemote(remote);
     store.save(state, pid);
     if (JSON.stringify(state.claimed) !== before) render();
+    else if (currentView() === 'album') renderAlbum();
   });
   if (!state.started) openIntro();
   else {

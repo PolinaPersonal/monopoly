@@ -72,3 +72,41 @@ export async function watchBoard(id, onChange) {
 }
 
 window.addEventListener('online', () => flush());
+
+// ---- Photo stamps ----
+// Stored as compressed JPEG text in photos/<board>__<square> (kept under
+// Firestore's 1 MB document limit), so they can be downloaded from any phone.
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1]);
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+
+export async function uploadPhoto(boardId, square, blob) {
+  if (!(await ready())) return false;
+  try {
+    const data = await blobToBase64(blob);
+    await api.setDoc(api.doc(db, 'photos', `${boardId}__${square}`), { board: boardId, square, data, at: Date.now() });
+    return true;
+  } catch (e) {
+    console.warn('Photo upload failed', e);
+    return false;
+  }
+}
+
+export async function downloadPhoto(boardId, square) {
+  if (!(await ready())) return null;
+  try {
+    const snap = await api.getDoc(api.doc(db, 'photos', `${boardId}__${square}`));
+    if (!snap.exists()) return null;
+    const bin = atob(snap.data().data);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: 'image/jpeg' });
+  } catch (e) {
+    return null;
+  }
+}

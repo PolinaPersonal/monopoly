@@ -1,5 +1,5 @@
 // Service worker: lets the app open with a weak signal and shows notifications.
-const VERSION = 'fullboard-v3';
+const VERSION = 'fullboard-v4';
 const ASSETS = [
   './',
   'index.html',

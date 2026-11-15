@@ -98,18 +98,11 @@ export function createBoard(host, { onSquareTap } = {}) {
           </div>
         </div></div>
       </div>
-      <div class="zoom-chip" data-role="chip">Full board</div>
-      <div class="zoom-ctl">
-        <button type="button" data-zoom="in" aria-label="Zoom in"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
-        <button type="button" data-zoom="out" aria-label="Zoom out"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
-        <button type="button" data-zoom="fit" aria-label="Show full board"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
-      </div>
     </div>`;
 
   const vp = host.querySelector('.board-vp');
   const sizer = host.querySelector('.board-sizer');
   const board = host.querySelector('.board');
-  const chip = host.querySelector('[data-role="chip"]');
   let fit = 0.5;
   let z = 0.5;
 
@@ -127,7 +120,6 @@ export function createBoard(host, { onSquareTap } = {}) {
     const rel = z / fit;
     const zoomed = rel > 1.01;
     vp.classList.toggle('zoomed', zoomed);
-    chip.textContent = zoomed ? `${rel.toFixed(1)}× zoom` : 'Full board';
   }
 
   function zoomTo(nz, ax, ay) {
@@ -145,16 +137,7 @@ export function createBoard(host, { onSquareTap } = {}) {
     const r = vp.getBoundingClientRect();
     return { x: cx - r.left, y: cy - r.top };
   };
-  const centre = () => ({ x: vp.clientWidth / 2, y: vp.clientHeight / 2 });
 
-  host.querySelector('.zoom-ctl').addEventListener('click', (e) => {
-    const b = e.target.closest('button');
-    if (!b) return;
-    const c = centre();
-    if (b.dataset.zoom === 'in') zoomTo(z * 1.6, c.x, c.y);
-    if (b.dataset.zoom === 'out') zoomTo(z / 1.6, c.x, c.y);
-    if (b.dataset.zoom === 'fit') zoomTo(fit, 0, 0);
-  });
 
   // Double-tap / double-click: zoom into that spot, or back out.
   let lastTap = 0;

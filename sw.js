@@ -1,5 +1,5 @@
 // Service worker: lets the app open with a weak signal and shows notifications.
-const VERSION = 'fullboard-v2';
+const VERSION = 'fullboard-v3';
 const ASSETS = [
   './',
   'index.html',
@@ -9,6 +9,8 @@ const ASSETS = [
   'js/data.js',
   'js/geo.js',
   'js/store.js',
+  'js/cloud.js',
+  'js/firebase-config.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',

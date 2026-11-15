@@ -15,7 +15,7 @@ A walking game for a group of friends: explore London and claim every street, st
 
 - **Places you've been before.** Tap any unclaimed deed and choose **We've been here before**, or use **Settings → Places we've already been**. A link can also pre-mark places, e.g. `?visited=angel-islington,kings-cross`.
 
-Everything is stored on the phone (no account, no server). One phone runs the game for the group.
+Each player types their name; their board is saved online (Firebase Firestore, project `london-monopoly-3e4ec`) under that name, so it survives refreshes, updates and new phones. Several phones can use the same name to share one board. Photo stamps stay on the phone that took them.
 
 ## Playing it
 

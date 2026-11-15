@@ -28,7 +28,8 @@ main { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 0.14em; color: var(--red); }
 .brand-city { font-size: 26px; font-weight: 900; letter-spacing: -0.02em; line-height: 1; }
 .top-actions { display: flex; align-items: center; gap: 4px; }
-.gps { font-size: 11.5px; font-weight: 700; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+/* GPS status is only shown in test mode or when location is blocked */
+.gps { display: none; font-size: 11.5px; font-weight: 700; color: var(--muted); display: flex; align-items: center; gap: 6px; }
 .gps::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #A39C8C; }
 .gps.live::before { background: #1FA34A; }
 .gps.test::before { background: #F28C28; }
@@ -263,3 +264,11 @@ main { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .past-row input { width: 22px; height: 22px; accent-color: var(--ink); margin: 0; flex: none; }
 .past-row small { display: block; font-size: 11.5px; font-weight: 600; color: var(--muted); }
 .past-swatch { width: 14px; height: 14px; border: 1.5px solid var(--ink); border-radius: 2px; flex: none; }
+
+.gps.test, .gps.blocked { display: flex; }
+
+/* Name screen */
+.name-form { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.name-label { font-size: 13px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.name-input { min-height: 56px; border: 2px solid var(--ink); border-radius: 12px; background: var(--white); padding: 0 16px; font: inherit; font-size: 20px; font-weight: 700; color: var(--ink); }
+.name-input:focus { outline: 3px solid #1B4FA0; outline-offset: 2px; }

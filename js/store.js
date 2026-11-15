@@ -1,11 +1,13 @@
 // Game state lives on this phone: small things in localStorage,
 // photo stamps (which are bigger) in IndexedDB.
 
-const KEY = 'fullboard.v1';
+const LEGACY_KEY = 'fullboard.v1';
+const keyFor = (id) => (id ? `fullboard.v2:${id}` : LEGACY_KEY);
 
 const blank = () => ({
   started: false,
-  claimed: {}, // id -> { at: ISO time, bonus: number }
+  claimed: {}, // id -> { at: ISO time, bonus: number, past?: true }
+  removed: {}, // id -> ms time it was unmarked (so other phones drop it too)
   cash: 0, // bonus money from cards
   setsAwarded: [], // colour sets whose bonus has fired
   nudged: {}, // id -> last nudge time (ms)
@@ -17,9 +19,13 @@ const blank = () => ({
   settings: { wakeLock: false },
 });
 
-export function load() {
+export function blankState() {
+  return blank();
+}
+
+export function load(id) {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(keyFor(id));
     if (!raw) return blank();
     return { ...blank(), ...JSON.parse(raw) };
   } catch (e) {
@@ -27,19 +33,34 @@ export function load() {
   }
 }
 
-export function save(state) {
+export function save(state, id) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(state));
+    localStorage.setItem(keyFor(id), JSON.stringify(state));
   } catch (e) {
     console.warn('Could not save game', e);
   }
 }
 
-export function reset() {
+export function reset(id) {
   try {
-    localStorage.removeItem(KEY);
+    localStorage.removeItem(keyFor(id));
   } catch (e) {}
   return blank();
+}
+
+// A board played before names existed (kept so nobody loses progress).
+export function loadLegacy() {
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    return raw ? { ...blank(), ...JSON.parse(raw) } : null;
+  } catch (e) {
+    return null;
+  }
+}
+export function clearLegacy() {
+  try {
+    localStorage.removeItem(LEGACY_KEY);
+  } catch (e) {}
 }
 
 // ---- Photos (IndexedDB) ----

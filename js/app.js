@@ -2,6 +2,7 @@ import { SQUARES, OWNABLE, BY_ID, COLORS, LIGHT_GROUPS, GROUP_NAMES, COLOUR_SETS
 import { distanceTo, anchorOf, formatDistance, haversine } from './geo.js';
 import * as store from './store.js';
 import { createBoard } from './board.js';
+import * as cloud from './cloud.js';
 
 // ---------- Tunables ----------
 const NUDGE_RADIUS = 1000; // metres
@@ -15,7 +16,10 @@ const CARD_WINDOW = 60 * 60 * 1000;
 const MAX_ACCURACY = 150; // ignore GPS fixes worse than this for claims
 
 // ---------- State ----------
-let state = store.load();
+let playerName = localStorage.getItem('fullboard.player') || '';
+let pid = playerName ? cloud.playerId(playerName) : '';
+let state = pid ? store.load(pid) : store.blankState();
+let unwatch = () => {};
 const params = new URLSearchParams(location.search);
 let testMode = params.has('test') || localStorage.getItem('fullboard.test') === '1';
 let lastPos = null; // { lat, lng, acc, at }
@@ -26,7 +30,25 @@ let alertsSeen = state.alerts.length;
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const persist = () => store.save(state);
+// Shape of a board as stored online (photos and phone-only settings stay local).
+function cloudShape() {
+  return {
+    name: playerName,
+    claimed: state.claimed,
+    removed: state.removed || {},
+    setsAwarded: state.setsAwarded,
+    cards: state.cards || [],
+    alerts: (state.alerts || []).slice(0, 40),
+    started: !!state.started,
+    startedAt: state.startedAt || 0,
+    updatedAt: Date.now(),
+  };
+}
+function persist() {
+  store.save(state, pid);
+  if (pid) cloud.saveBoard(pid, cloudShape());
+}
+const photoKey = (id) => `${pid}:${id}`;
 const fmtMoney = (n) => `£${n.toLocaleString('en-GB')}`;
 
 // ---------- Derived numbers ----------
@@ -180,7 +202,7 @@ async function renderAlbum() {
   const items = await Promise.all(
     ids.map(async (id) => {
       const s = BY_ID[id];
-      const blob = await store.getPhoto(id);
+      const blob = await store.getPhoto(photoKey(id));
       let media;
       if (blob) {
         const url = URL.createObjectURL(blob);
@@ -392,6 +414,7 @@ function markPast(id) {
   const s = BY_ID[id];
   if (!s || state.claimed[id]) return;
   state.claimed[id] = { at: new Date().toISOString(), bonus: 0, past: true };
+  if (state.removed) delete state.removed[id];
   if (s.kind === 'property' && isSetComplete(s.group) && !state.setsAwarded.includes(s.group)) state.setsAwarded.push(s.group);
   persist();
   render();
@@ -401,6 +424,8 @@ function unmarkPast(id) {
   const c = state.claimed[id];
   if (!c || !c.past) return;
   delete state.claimed[id];
+  state.removed = state.removed || {};
+  state.removed[id] = Date.now();
   const s = BY_ID[id];
   if (s && s.group) state.setsAwarded = state.setsAwarded.filter((g) => g !== s.group || isSetComplete(g));
   persist();
@@ -534,7 +559,7 @@ function openPhoto(id) {
     photoInput.click();
     return;
   }
-  store.getPhoto(id).then((blob) => {
+  store.getPhoto(photoKey(id)).then((blob) => {
     if (blob) showPhotoSheet(id, blob);
     else {
       delete state.photos[id];
@@ -596,7 +621,7 @@ photoInput.addEventListener('change', async () => {
   const id = photoTarget;
   try {
     const blob = await composeStamp(BY_ID[id], file);
-    await store.savePhoto(id, blob);
+    await store.savePhoto(photoKey(id), blob);
     state.photos[id] = true;
     persist();
     if (currentView() === 'album') renderAlbum();
@@ -756,6 +781,7 @@ function claim(s, pos) {
     state.activeCard = null;
   }
   state.claimed[s.id] = { at: new Date().toISOString(), bonus };
+  if (state.removed) delete state.removed[s.id];
   persist();
 
   const rent = s.kind === 'property' ? `Rent £${s.rents[0]}.` : s.kind === 'station' ? 'Rent £25.' : '';
@@ -873,7 +899,7 @@ function onPosition(pos) {
 
 function updateGpsLabel() {
   const el = $('[data-role="gps"]');
-  el.classList.remove('live', 'test');
+  el.classList.remove('live', 'test', 'blocked');
   if (testMode) {
     el.textContent = 'Test mode';
     el.classList.add('test');
@@ -892,6 +918,7 @@ function startTracking() {
     (err) => {
       const el = $('[data-role="gps"]');
       el.textContent = err.code === 1 ? 'Location blocked' : 'No GPS signal';
+      el.classList.add('blocked');
       if (err.code === 1) toast('Location is turned off', 'Allow location for this site in your browser settings so properties can claim themselves.');
     },
     { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 }
@@ -940,7 +967,7 @@ function openIntro() {
   }).join('');
   showOverlay(
     `<div class="sheet">
-      <div class="sheet-top"><span class="eyebrow">LONDON MONOPOLY · UNOFFICIAL FAN GAME</span></div>
+      <div class="sheet-top"><span class="eyebrow">LONDON MONOPOLY</span></div>
       <h1 class="serif">Complete the board.</h1>
       <p class="lede">Walk London as a crew and claim every street, station and utility on the Monopoly board.</p>
       <div class="intro-board" aria-hidden="true">${squares}</div>
@@ -995,12 +1022,13 @@ function openSettings() {
     `<div class="sheet">
       <div class="sheet-top"><span class="eyebrow">SETTINGS</span>${CLOSE_BTN}</div>
       <div class="settings-list">
+        <div class="setting"><div class="setting-row"><b>Playing as ${esc(playerName || '…')}</b><button type="button" class="small-btn" data-act="switch">Switch</button></div><p>Your board is saved online under this name. Type the same name on any phone to open it. Friends can use the same name to play one shared board.</p></div>
         <div class="setting"><div class="setting-row"><b>Notifications</b>${'Notification' in window && Notification.permission === 'default' ? '<button type="button" class="small-btn" data-act="notif">Allow</button>' : ''}</div><p>${esc(notif)}. Alerts show on your lock screen when the app is in the background.</p></div>
         <div class="setting"><div class="setting-row"><b>Keep screen awake</b><label class="switch"><input type="checkbox" data-act="wake" ${state.settings.wakeLock ? 'checked' : ''} aria-label="Keep screen awake"><span></span></label></div><p>Phones pause location when the screen locks. Turn this on while you walk so nothing gets missed.</p></div>
         <div class="setting"><div class="setting-row"><b>Test mode</b><label class="switch"><input type="checkbox" data-act="test" ${testMode ? 'checked' : ''} aria-label="Test mode"><span></span></label></div><p>Pretend to be anywhere on the board to try claims, nudges and cards without walking. Turns off real GPS.</p></div>
         <div class="setting"><div class="setting-row"><b>Places we’ve already been</b><button type="button" class="small-btn" data-act="past">Choose</button></div><p>Mark places the crew visited before you started using the app.</p></div>
         <div class="setting"><b>Utility stand-ins</b><p>Electric Company is Battersea Power Station. Water Works is the Museum of Water &amp; Steam at Kew Bridge.</p></div>
-        <div class="setting"><div class="setting-row"><b>Reset the game</b><button type="button" class="small-btn danger" data-act="reset">Reset</button></div><p>Clears every deed, photo and alert on this phone.</p></div>
+        <div class="setting"><div class="setting-row"><b>Reset the game</b><button type="button" class="small-btn danger" data-act="reset">Reset</button></div><p>Clears every deed and alert on this board, on every phone using it.</p></div>
       </div>
     </div>`,
     '',
@@ -1018,10 +1046,11 @@ function openSettings() {
       });
       el.querySelector('[data-act="test"]').addEventListener('change', (e) => setTestMode(e.target.checked));
       el.querySelector('[data-act="past"]').addEventListener('click', openPastPicker);
+      el.querySelector('[data-act="switch"]').addEventListener('click', () => openNameScreen(true));
       el.querySelector('[data-act="reset"]').addEventListener('click', async () => {
         if (!confirm('Reset the whole game? All deeds and photos on this phone will be deleted.')) return;
-        state = store.reset();
-        await store.clearPhotos();
+        state = store.reset(pid);
+        persist();
         alertsSeen = 0;
         closeOverlay();
         render();
@@ -1125,15 +1154,132 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-const preMarked = applyVisitedParam();
-render();
+// ---------- Players & cloud sync ----------
+function claimTime(c) {
+  return Date.parse(c.at) || 0;
+}
+
+// Combine this phone's board with the saved one: for each square the
+// latest event (claimed or unmarked) wins, so nothing is lost either way.
+function mergeRemote(r) {
+  if (!r) return;
+  const lc = state.claimed || {};
+  const rc = r.claimed || {};
+  const lr = state.removed || {};
+  const rr = r.removed || {};
+  const ids = new Set([...Object.keys(lc), ...Object.keys(rc), ...Object.keys(lr), ...Object.keys(rr)]);
+  const claimed = {};
+  const removed = {};
+  ids.forEach((id) => {
+    if (!BY_ID[id]) return;
+    let c = lc[id] && rc[id] ? (claimTime(lc[id]) <= claimTime(rc[id]) ? lc[id] : rc[id]) : lc[id] || rc[id];
+    const rm = Math.max(lr[id] || 0, rr[id] || 0);
+    if (c && claimTime(c) >= rm) claimed[id] = c;
+    else if (rm) removed[id] = rm;
+  });
+  state.claimed = claimed;
+  state.removed = removed;
+  const cards = {};
+  [...(state.cards || []), ...(r.cards || [])].forEach((c) => (cards[c.at] = c));
+  state.cards = Object.values(cards).sort((a, b) => a.at.localeCompare(b.at));
+  state.cash = state.cards.reduce((sum, c) => sum + (c.cash || 0), 0);
+  const alerts = {};
+  [...(state.alerts || []), ...(r.alerts || [])].forEach((a) => (alerts[a.at + a.title] = a));
+  state.alerts = Object.values(alerts).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 60);
+  state.setsAwarded = [...new Set([...(state.setsAwarded || []), ...(r.setsAwarded || [])])].filter(isSetComplete);
+  if (r.started) state.started = true;
+  if (r.startedAt && (!state.startedAt || r.startedAt < state.startedAt)) state.startedAt = r.startedAt;
+}
+
+function updatePlayerLabel() {
+  $('[data-role="player"]').textContent = playerName ? `${playerName.toUpperCase()} · LONDON` : 'LONDON';
+}
+
+async function enterBoard(name) {
+  stopTracking();
+  unwatch();
+  playerName = name.trim();
+  pid = cloud.playerId(playerName);
+  localStorage.setItem('fullboard.player', playerName);
+  state = store.load(pid);
+  // Bring across a board played on this phone before names existed.
+  const legacy = store.loadLegacy();
+  if (legacy && Object.keys(legacy.claimed || {}).length) {
+    mergeRemote(legacy);
+    state.started = true;
+    store.clearLegacy();
+  }
+  let isNew = !Object.keys(state.claimed).length && !state.started;
+  try {
+    const remote = await cloud.loadBoard(pid);
+    if (remote) {
+      mergeRemote(remote);
+      isNew = false;
+    }
+  } catch (e) {
+    toast('Playing offline', 'Your board will save online as soon as you’re connected.');
+  }
+  alertsSeen = state.alerts.length;
+  const preMarked = applyVisitedParam();
+  persist();
+  updatePlayerLabel();
+  render();
+  unwatch = await cloud.watchBoard(pid, (remote) => {
+    const before = JSON.stringify(state.claimed);
+    mergeRemote(remote);
+    store.save(state, pid);
+    if (JSON.stringify(state.claimed) !== before) render();
+  });
+  if (!state.started) openIntro();
+  else {
+    if (testMode) startTest();
+    else startTracking();
+    if (!isNew) toast(`Welcome back, ${playerName}`, `${claimedCount()} of 28 on your board.`);
+  }
+  if (preMarked) setTimeout(() => toast(`${preMarked} places added from your link`, 'They’re on the board as places you’ve been before.'), 800);
+}
+
+function openNameScreen(switching = false) {
+  showOverlay(
+    `<div class="sheet">
+      <div class="sheet-top"><span class="eyebrow">LONDON MONOPOLY</span>${switching ? CLOSE_BTN : ''}</div>
+      <h1 class="serif">${switching ? 'Switch player' : 'Who’s playing?'}</h1>
+      <p class="lede">Your board is saved under your name. Type the same name on any phone, any time, to pick up where you left off.</p>
+      <form class="name-form" data-act="name-form">
+        <label class="name-label" for="player-name">Your name</label>
+        <input id="player-name" class="name-input" type="text" autocomplete="nickname" autocapitalize="words" maxlength="40" placeholder="e.g. Polina" value="${switching ? '' : esc(playerName)}" required>
+        <button type="submit" class="btn btn-dark">Open my board</button>
+      </form>
+      <p class="status-line" style="font-weight:600">Playing together? Everyone can type the same name to share one board.</p>
+    </div>`,
+    '',
+    (el) => {
+      const input = el.querySelector('#player-name');
+      setTimeout(() => input.focus(), 50);
+      el.querySelector('[data-act="name-form"]').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = input.value.trim();
+        if (!cloud.playerId(name)) {
+          input.focus();
+          return;
+        }
+        const btn = el.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        btn.textContent = 'Opening your board…';
+        closeOverlay();
+        await enterBoard(name);
+      });
+    }
+  );
+}
+
 updateGpsLabel();
 applyWakeLock();
-if (!state.started) openIntro();
-else if (testMode) startTest();
-else startTracking();
-
-if (preMarked) setTimeout(() => toast(`${preMarked} places added from your link`, 'They’re on the board as places you’ve been before.'), 600);
+if (pid) enterBoard(playerName);
+else {
+  render();
+  openNameScreen();
+}
 
 // Expose a tiny hook for debugging in the console.
 window.fullBoard = { state: () => state, claim: (id) => claim(BY_ID[id], lastPos), haversine };

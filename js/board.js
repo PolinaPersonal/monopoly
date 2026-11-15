@@ -91,8 +91,8 @@ export function createBoard(host, { onSquareTap } = {}) {
             <div class="centre-card centre-chance" aria-hidden="true">CHANCE ?</div>
             <div class="centre-card centre-chest" aria-hidden="true">COMMUNITY<br>CHEST</div>
             <div class="centre-title">
-              <span class="centre-city">COMPLETE</span>
-              <span class="centre-word">THE BOARD</span>
+              <span class="centre-city">LONDON</span>
+              <span class="centre-word">MONOPOLY</span>
               <span class="centre-count" data-role="count"></span>
             </div>
           </div>

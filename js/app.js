@@ -548,7 +548,6 @@ function openCard(card) {
         <h2>${esc(card.title)}</h2>
         <p>${esc(card.body)}</p>
       </div>
-      <p class="note">Card ${card.n} of ${CARD_MAX_PER_DAY} today${target ? ' · Chance only sends you somewhere within 1 km' : ''}</p>
       <div class="actions">
         ${target ? `<a class="btn btn-light" href="${mapsLink(target)}" target="_blank" rel="noopener">Walk me there</a>` : ''}
         <button type="button" class="btn-link" data-close>${target ? 'Keep it for later' : 'Lovely'}</button>

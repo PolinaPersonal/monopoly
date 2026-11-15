@@ -1,6 +1,6 @@
 {
-  "name": "Full Board · London",
-  "short_name": "Full Board",
+  "name": "London Monopoly (fan game)",
+  "short_name": "London Monopoly",
   "description": "Walk London and complete the Monopoly board.",
   "start_url": "./",
   "scope": "./",

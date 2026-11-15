@@ -1,4 +1,4 @@
-# Full Board · London
+# London Monopoly (unofficial fan game)
 
 A walking game for a group of friends: explore London and claim every street, station and utility on the UK Monopoly board, until the board is complete.
 
@@ -12,6 +12,8 @@ A walking game for a group of friends: explore London and claim every street, st
 - **Chance and Community Chest cards (rare).** There are at most 2 a day, never in the first 15 minutes. A card only points you somewhere if it's within 1 km, and claiming that place within the hour pays a £50 bonus.
 - **Photo stamps.** Add a crew selfie to any deed. The photo is framed as a title deed with a dated "ACQUIRED" stamp, ready to share.
 - **Counters.** Properties claimed out of 28, colour sets out of 8, bonuses, and the portfolio value in Monopoly money.
+
+- **Places you've been before.** Tap any unclaimed deed and choose **We've been here before**, or use **Settings → Places we've already been**. A link can also pre-mark places, e.g. `?visited=angel-islington,kings-cross`.
 
 Everything is stored on the phone (no account, no server). One phone runs the game for the group.
 

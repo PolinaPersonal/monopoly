@@ -328,7 +328,9 @@ function deedHTML(s) {
     s.kind === 'property'
       ? `<div class="deed-head" style="background:${color};color:${headInk}"><small>TITLE DEED</small><strong>${esc(s.name)}</strong></div>`
       : `<div class="deed-head"><small>TITLE DEED</small><strong>${esc(s.name)}</strong></div>`;
-  const stamp = claim ? `<div class="stamp" aria-hidden="true"><b>OWNED</b><span>THE CREW · ${stampDate(claim.at)}</span></div>` : '';
+  const stamp = claim
+    ? `<div class="stamp" aria-hidden="true"><b>OWNED</b><span>${claim.past ? 'BEEN HERE BEFORE' : `THE CREW · ${stampDate(claim.at)}`}</span></div>`
+    : '';
   return `<div class="deed${claim ? ' owned' : ''}">${head}<div class="deed-body">${body}</div>${stamp}</div>`;
 }
 
@@ -351,8 +353,10 @@ function openDeed(id, fresh = false) {
   }
   const actions = claim
     ? `<button type="button" class="btn btn-dark" data-act="photo">${CAMERA_ICON} ${fresh ? 'Stamp it with a crew photo' : 'Photo stamp'}</button>
+       ${claim.past ? '<button type="button" class="btn-link" data-act="unmark">Unmark: we haven’t been here</button>' : ''}
        <button type="button" class="btn-link" data-close>${fresh ? 'Back to the board' : 'Close'}</button>`
-    : `<button type="button" class="btn-link" data-close>Close</button>`;
+    : `<button type="button" class="btn btn-light" data-act="mark">We’ve been here before</button>
+       <button type="button" class="btn-link" data-close>Close</button>`;
   showOverlay(
     `<div class="sheet">
       <div class="sheet-top"><span class="eyebrow">${fresh ? 'PROPERTY ACQUIRED' : claim ? 'OWNED BY THE CREW' : 'TITLE DEED'}</span>${CLOSE_BTN}</div>
@@ -363,8 +367,89 @@ function openDeed(id, fresh = false) {
     (el) => {
       const p = el.querySelector('[data-act="photo"]');
       if (p) p.addEventListener('click', () => openPhoto(id));
+      const m = el.querySelector('[data-act="mark"]');
+      if (m)
+        m.addEventListener('click', () => {
+          markPast(id);
+          closeOverlay();
+          openDeed(id);
+          toast(`${s.name} marked as visited`, 'Added to the board from a past trip.');
+        });
+      const u = el.querySelector('[data-act="unmark"]');
+      if (u)
+        u.addEventListener('click', () => {
+          unmarkPast(id);
+          closeOverlay();
+        });
     }
   );
+}
+
+// ---------- Places visited before the game ----------
+// These count towards the board and the counters, but skip the
+// celebration screens (you weren't standing there when you ticked them).
+function markPast(id) {
+  const s = BY_ID[id];
+  if (!s || state.claimed[id]) return;
+  state.claimed[id] = { at: new Date().toISOString(), bonus: 0, past: true };
+  if (s.kind === 'property' && isSetComplete(s.group) && !state.setsAwarded.includes(s.group)) state.setsAwarded.push(s.group);
+  persist();
+  render();
+}
+
+function unmarkPast(id) {
+  const c = state.claimed[id];
+  if (!c || !c.past) return;
+  delete state.claimed[id];
+  const s = BY_ID[id];
+  if (s && s.group) state.setsAwarded = state.setsAwarded.filter((g) => g !== s.group || isSetComplete(g));
+  persist();
+  render();
+}
+
+function openPastPicker() {
+  const groups = ['brown', 'lblue', 'pink', 'orange', 'red', 'yellow', 'green', 'dblue', 'station', 'utility'];
+  const rows = groups
+    .map((g) => {
+      const items = groupMembers(g)
+        .map((m) => {
+          const c = state.claimed[m.id];
+          const locked = c && !c.past;
+          return `<label class="past-row">
+            <input type="checkbox" data-past="${m.id}" ${c ? 'checked' : ''} ${locked ? 'disabled' : ''}>
+            <span class="past-swatch" style="background:${COLORS[g]}"></span>
+            <span>${esc(m.name)}${locked ? '<small>Claimed on foot</small>' : ''}</span></label>`;
+        })
+        .join('');
+      return `<fieldset class="past-group"><legend>${esc(GROUP_NAMES[g])}</legend>${items}</fieldset>`;
+    })
+    .join('');
+  showOverlay(
+    `<div class="sheet">
+      <div class="sheet-top"><span class="eyebrow">ALREADY BEEN?</span>${CLOSE_BTN}</div>
+      <h1 class="serif">Places we’ve been</h1>
+      <p class="lede">Tick anywhere the crew has already visited. They go straight onto the board and count towards your sets.</p>
+      ${rows}
+      <div class="actions"><button type="button" class="btn btn-dark" data-close>Done</button></div>
+    </div>`,
+    '',
+    (el) =>
+      el.querySelectorAll('[data-past]').forEach((cb) =>
+        cb.addEventListener('change', () => (cb.checked ? markPast(cb.dataset.past) : unmarkPast(cb.dataset.past)))
+      )
+  );
+}
+
+// A shareable link can pre-mark places: ?visited=angel-islington,kings-cross
+function applyVisitedParam() {
+  const v = params.get('visited');
+  if (!v) return 0;
+  const ids = v.split(',').map((x) => x.trim()).filter((id) => BY_ID[id] && BY_ID[id].fact);
+  ids.forEach(markPast);
+  params.delete('visited');
+  const q = params.toString();
+  history.replaceState(null, '', location.pathname + (q ? `?${q}` : ''));
+  return ids.length;
 }
 
 const CAMERA_ICON = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>`;
@@ -499,7 +584,7 @@ async function sharePhoto(s, blob) {
 function downloadBlob(s, blob) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `full-board-${s.id}.jpg`;
+  a.download = `london-monopoly-${s.id}.jpg`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -596,11 +681,18 @@ async function composeStamp(s, file) {
   x.stroke();
   x.fillStyle = '#B3121F';
   x.font = '800 24px Archivo, sans-serif';
-  x.fillText('ACQUIRED', 0, -36);
-  x.font = '900 50px Archivo, sans-serif';
-  x.fillText(when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase(), 0, 16);
-  x.font = '800 22px Archivo, sans-serif';
-  x.fillText(`${when.getFullYear()} · ${when.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`, 0, 52);
+  if (claim && claim.past) {
+    x.font = '800 24px Archivo, sans-serif';
+    x.fillText('BEEN HERE', 0, -30);
+    x.font = '900 46px Archivo, sans-serif';
+    x.fillText('BEFORE', 0, 22);
+  } else {
+    x.fillText('ACQUIRED', 0, -36);
+    x.font = '900 50px Archivo, sans-serif';
+    x.fillText(when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase(), 0, 16);
+    x.font = '800 22px Archivo, sans-serif';
+    x.fillText(`${when.getFullYear()} · ${when.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`, 0, 52);
+  }
   x.restore();
   // footer
   x.fillStyle = '#1B1B1B';
@@ -848,7 +940,7 @@ function openIntro() {
   }).join('');
   showOverlay(
     `<div class="sheet">
-      <div class="sheet-top"><span class="eyebrow">FULL BOARD · LONDON</span></div>
+      <div class="sheet-top"><span class="eyebrow">LONDON MONOPOLY · UNOFFICIAL FAN GAME</span></div>
       <h1 class="serif">Complete the board.</h1>
       <p class="lede">Walk London as a crew and claim every street, station and utility on the Monopoly board.</p>
       <div class="intro-board" aria-hidden="true">${squares}</div>
@@ -860,11 +952,18 @@ function openIntro() {
       </ul>
       <div class="actions">
         <button type="button" class="btn btn-dark" data-act="start">Start the game</button>
+        <button type="button" class="btn-link" data-act="past">We’ve already been to some places</button>
         <p class="status-line" style="font-weight:600">We’ll ask for your location and permission to send notifications.</p>
       </div>
     </div>`,
     '',
-    (el) => el.querySelector('[data-act="start"]').addEventListener('click', startGame)
+    (el) => {
+      el.querySelector('[data-act="start"]').addEventListener('click', startGame);
+      el.querySelector('[data-act="past"]').addEventListener('click', async () => {
+        await startGame();
+        openPastPicker();
+      });
+    }
   );
 }
 
@@ -899,6 +998,7 @@ function openSettings() {
         <div class="setting"><div class="setting-row"><b>Notifications</b>${'Notification' in window && Notification.permission === 'default' ? '<button type="button" class="small-btn" data-act="notif">Allow</button>' : ''}</div><p>${esc(notif)}. Alerts show on your lock screen when the app is in the background.</p></div>
         <div class="setting"><div class="setting-row"><b>Keep screen awake</b><label class="switch"><input type="checkbox" data-act="wake" ${state.settings.wakeLock ? 'checked' : ''} aria-label="Keep screen awake"><span></span></label></div><p>Phones pause location when the screen locks. Turn this on while you walk so nothing gets missed.</p></div>
         <div class="setting"><div class="setting-row"><b>Test mode</b><label class="switch"><input type="checkbox" data-act="test" ${testMode ? 'checked' : ''} aria-label="Test mode"><span></span></label></div><p>Pretend to be anywhere on the board to try claims, nudges and cards without walking. Turns off real GPS.</p></div>
+        <div class="setting"><div class="setting-row"><b>Places we’ve already been</b><button type="button" class="small-btn" data-act="past">Choose</button></div><p>Mark places the crew visited before you started using the app.</p></div>
         <div class="setting"><b>Utility stand-ins</b><p>Electric Company is Battersea Power Station. Water Works is the Museum of Water &amp; Steam at Kew Bridge.</p></div>
         <div class="setting"><div class="setting-row"><b>Reset the game</b><button type="button" class="small-btn danger" data-act="reset">Reset</button></div><p>Clears every deed, photo and alert on this phone.</p></div>
       </div>
@@ -917,6 +1017,7 @@ function openSettings() {
         applyWakeLock();
       });
       el.querySelector('[data-act="test"]').addEventListener('change', (e) => setTestMode(e.target.checked));
+      el.querySelector('[data-act="past"]').addEventListener('click', openPastPicker);
       el.querySelector('[data-act="reset"]').addEventListener('click', async () => {
         if (!confirm('Reset the whole game? All deeds and photos on this phone will be deleted.')) return;
         state = store.reset();
@@ -1024,12 +1125,15 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+const preMarked = applyVisitedParam();
 render();
 updateGpsLabel();
 applyWakeLock();
 if (!state.started) openIntro();
 else if (testMode) startTest();
 else startTracking();
+
+if (preMarked) setTimeout(() => toast(`${preMarked} places added from your link`, 'They’re on the board as places you’ve been before.'), 600);
 
 // Expose a tiny hook for debugging in the console.
 window.fullBoard = { state: () => state, claim: (id) => claim(BY_ID[id], lastPos), haversine };

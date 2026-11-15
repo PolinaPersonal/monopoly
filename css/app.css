@@ -255,3 +255,11 @@ main { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .test-fab { position: fixed; right: 12px; bottom: calc(84px + var(--safe-b)); z-index: 40; min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1.5px solid var(--ink); background: #F28C28; font-weight: 900; font-size: 12px; letter-spacing: 0.1em; box-shadow: 3px 3px 0 var(--ink); cursor: pointer; }
 .test-select { width: 100%; min-height: 44px; border-radius: 10px; border: 1.5px solid var(--ink); background: var(--white); font: inherit; font-size: 15px; padding: 0 10px; }
 .test-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+
+/* Places visited before */
+.past-group { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.past-group legend { font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; padding: 0; }
+.past-row { display: flex; align-items: center; gap: 12px; min-height: 48px; background: var(--white); border: 1.5px solid var(--ink); border-radius: 10px; padding: 0 12px; font-size: 15px; font-weight: 700; cursor: pointer; }
+.past-row input { width: 22px; height: 22px; accent-color: var(--ink); margin: 0; flex: none; }
+.past-row small { display: block; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.past-swatch { width: 14px; height: 14px; border: 1.5px solid var(--ink); border-radius: 2px; flex: none; }

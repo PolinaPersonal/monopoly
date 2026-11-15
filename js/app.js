@@ -349,13 +349,13 @@ function openDeed(id, fresh = false) {
   let status = '';
   if (!claim) {
     const d = lastPos ? distanceTo(s, [lastPos.lat, lastPos.lng]) : null;
-    status = `<p class="status-line">Not yours yet${d !== null && d <= NUDGE_RADIUS ? ` · ${formatDistance(d)} away` : ''}. Walk there to claim it.</p>`;
+    status = `<p class="status-line">Not ticked off yet${d !== null && d <= NUDGE_RADIUS ? ` · ${formatDistance(d)} away` : ''}. Walk there, or tick it below if you’ve already been.</p>`;
   }
   const actions = claim
     ? `<button type="button" class="btn btn-dark" data-act="photo">${CAMERA_ICON} ${fresh ? 'Stamp it with a crew photo' : 'Photo stamp'}</button>
        ${claim.past ? '<button type="button" class="btn-link" data-act="unmark">Unmark: we haven’t been here</button>' : ''}
        <button type="button" class="btn-link" data-close>${fresh ? 'Back to the board' : 'Close'}</button>`
-    : `<button type="button" class="btn btn-light" data-act="mark">We’ve been here before</button>
+    : `<button type="button" class="btn btn-dark" data-act="mark"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg> We’ve been here</button>
        <button type="button" class="btn-link" data-close>Close</button>`;
   showOverlay(
     `<div class="sheet">
@@ -373,7 +373,7 @@ function openDeed(id, fresh = false) {
           markPast(id);
           closeOverlay();
           openDeed(id);
-          toast(`${s.name} marked as visited`, 'Added to the board from a past trip.');
+          toast(`${s.name} ticked off`, 'It’s on the board now.');
         });
       const u = el.querySelector('[data-act="unmark"]');
       if (u)
